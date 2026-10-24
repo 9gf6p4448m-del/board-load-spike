@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>借勢 spike dom-svg</title>
-    <!-- The <style> block is byte-identical in ../three/index.html. -->
+    <title>借勢 spike three</title>
+    <!-- The <style> block is byte-identical in ../dom-svg/index.html. -->
     <style>html,body{background:#11141c;height:100%;margin:0}body{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;justify-content:center;align-items:center;min-height:100dvh;display:flex}#app{aspect-ratio:1;width:min(390px,100vw)}#app>svg,#app>canvas{width:100%;height:100%;display:block}</style>
-    <script type="module" crossorigin src="./assets/index-BbDMdXRu.js"></script>
+    <script type="module" crossorigin src="./assets/index-ThmxgdN0.js"></script>
   </head>
   <body>
     <div id="app"></div>
@@ -17,7 +17,7 @@
 <button id="rum-c" type="button" hidden style="margin-top:4px;padding:6px 12px;font:inherit">複製結果</button></div>
 <script>
 (function () {
-  var LABEL = 'dom', BUILD = '660867b 2026-10-24T04:54Z', TIMEOUT_MS = 60000;
+  var LABEL = 'three@r2', BUILD = 'f3fdc4d 2026-10-24T05:10Z', TIMEOUT_MS = 60000;
   var text = document.getElementById('rum-t'), btn = document.getElementById('rum-c');
   var errors = [], started = false, finished = false, ready = null, paint = null, line = '';
 
@@ -36,37 +36,40 @@
     var known = 0, warm = 0, xfer = 0;
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
-      if (typeof e.transferSize !== 'number' || !(e.encodedBodySize > 0)) continue;
+      if (typeof e.transferSize !== 'number') continue;
       known++;
       xfer += e.transferSize;
-      if (e.transferSize < e.encodedBodySize) warm++; // 0 = served from cache, headers only = 304 revalidation
+      // A network response always carries header bytes, so 0 = served from cache (iOS Safari also zeroes the
+      // body sizes then); fewer bytes than the body = 304 revalidation.
+      if (e.transferSize === 0 || e.transferSize < e.encodedBodySize) warm++;
     }
     return {
       ttfb: nav ? ms(nav.responseStart) : 0,
       dns: nav ? ms(nav.domainLookupEnd - nav.domainLookupStart) : 0,
       conn: nav ? ms(nav.connectEnd - nav.connectStart) : 0,
       type: nav ? nav.type : '-',
+      sized: !!nav && typeof nav.transferSize === 'number',
       known: known, warm: warm, xfer: xfer
     };
   }
 
   function render() {
     var m = measure();
-    var vp = window.innerWidth + 'x' + window.innerHeight;
+    var vp = window.innerWidth + 'x' + window.innerHeight, dpr = Math.round(window.devicePixelRatio * 100) / 100;
     var verdict = ready === null ? '⚠️ ' + TIMEOUT_MS / 1000 + ' 秒內棋盤沒出現'
-      : m.warm > 0 ? '⚠️ 用到快取 ' + m.warm + '/' + m.known + '，不算：關掉分頁重來'
-      : m.known === 0 ? '✅ 算數（瀏覽器不回報快取，靠新的私密分頁保證）'
+      : !m.sized ? '⚠️ 瀏覽器不回報傳輸量，無法判定是不是冷啟動，不算'
+      : m.warm > 0 ? '⚠️ 用到快取 ' + m.warm + '/' + m.known + '，不算'
       : '✅ 沒用到快取，這次算數';
     text.textContent =
       LABEL + ' 棋盤出現 ' + (ready === null ? '-' : Math.round(ready)) + ' ms' +
       (paint === null ? '' : '（下一幀 ' + Math.round(paint) + ' ms）') + '\n' +
       '首位元組 ' + m.ttfb + ' · DNS ' + m.dns + ' · 連線 ' + m.conn + ' ms · 傳輸 ' + (m.xfer / 1024).toFixed(1) + ' KB\n' +
       verdict + '\n' +
-      'build ' + BUILD + ' · DPR ' + window.devicePixelRatio + ' · ' + vp +
+      'build ' + BUILD + ' · DPR ' + dpr + ' · ' + vp +
       (errors.length ? '\n錯誤 ' + errors.join(' | ') : '');
     line = ['rum1', LABEL, 'ready=' + (ready === null ? 'timeout' : Math.round(ready)),
       'paint=' + (paint === null ? '-' : Math.round(paint)), 'ttfb=' + m.ttfb, 'dns=' + m.dns, 'conn=' + m.conn,
-      'cache=' + m.warm + '/' + m.known, 'xfer=' + m.xfer, 'nav=' + m.type, 'dpr=' + window.devicePixelRatio,
+      'cache=' + m.warm + '/' + m.known, 'xfer=' + m.xfer, 'nav=' + m.type, 'dpr=' + dpr,
       'vp=' + vp, 'build=' + BUILD.replace(/ /g, '_'), 'err=' + errors.length, 'ua=' + navigator.userAgent].join(' ');
     btn.hidden = false;
   }
