@@ -2,7 +2,7 @@
 
 三個頁面功能相同：5×5 空白棋盤，點一格會換色，只差用的技術。要量的是 iPhone 用行動網路第一次打開、到棋盤出現要多久。
 
-build `bc82a4e 2026-10-24T03:32Z`
+build `660867b 2026-10-24T04:54Z`
 
 ## 每一次怎麼量
 
@@ -16,5 +16,5 @@ build `bc82a4e 2026-10-24T03:32Z`
 
 - [DOM / SVG](https://9gf6p4448m-del.github.io/board-load-spike/dom/)
 - [three.js](https://9gf6p4448m-del.github.io/board-load-spike/three/)
+- [Unity WebGL](https://9gf6p4448m-del.github.io/board-load-spike/unity/)
 
-還沒放上來：Unity WebGL（建置中）。
