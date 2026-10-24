@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>借勢 spike dom-svg</title>
+    <!-- The <style> block is byte-identical in ../three/index.html. -->
+    <style>html,body{background:#11141c;height:100%;margin:0}body{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;justify-content:center;align-items:center;min-height:100dvh;display:flex}#app{aspect-ratio:1;width:min(390px,100vw)}#app>svg,#app>canvas{width:100%;height:100%;display:block}</style>
+    <script type="module" crossorigin src="./assets/index-BbDMdXRu.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  <!-- Load-time readout for real-device runs (no devtools on the phone). spike/pages/stage.mjs inserts this block
+     before </body> of every staged spike page; it is byte-identical across dom/three/unity except the label and
+     build id. "ready" = startTime of the page's own performance.mark('board-ready'), i.e. ms since navigation start. -->
+<div id="rum" style="position:fixed;left:0;right:0;top:0;z-index:9;padding:6px 8px;font:12px/1.5 ui-monospace,Menlo,monospace;color:#d6dcea;background:rgba(0,0,0,.7);white-space:pre-wrap;-webkit-user-select:text;user-select:text"><span id="rum-t">量測中…</span>
+<button id="rum-c" type="button" hidden style="margin-top:4px;padding:6px 12px;font:inherit">複製結果</button></div>
+<script>
+(function () {
+  var LABEL = 'dom', BUILD = 'bc82a4e 2026-10-24T03:32Z', TIMEOUT_MS = 60000;
+  var text = document.getElementById('rum-t'), btn = document.getElementById('rum-c');
+  var errors = [], started = false, finished = false, ready = null, paint = null, line = '';
+
+  // Errors are shown on screen because a phone has no console to read.
+  function note(msg) { errors.push(String(msg).slice(0, 160)); if (finished) render(); }
+  window.addEventListener('error', function (e) { note(e.message || 'error'); });
+  window.addEventListener('unhandledrejection', function (e) { var r = e.reason; note('rejection: ' + (r && r.message ? r.message : r)); });
+  var origError = console.error;
+  console.error = function () { note(Array.prototype.join.call(arguments, ' ')); return origError.apply(console, arguments); };
+
+  function ms(v) { return typeof v === 'number' && v > 0 ? Math.round(v) : 0; }
+
+  function measure() {
+    var nav = performance.getEntriesByType('navigation')[0];
+    var list = (nav ? [nav] : []).concat(performance.getEntriesByType('resource'));
+    var known = 0, warm = 0, xfer = 0;
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (typeof e.transferSize !== 'number' || !(e.encodedBodySize > 0)) continue;
+      known++;
+      xfer += e.transferSize;
+      if (e.transferSize < e.encodedBodySize) warm++; // 0 = served from cache, headers only = 304 revalidation
+    }
+    return {
+      ttfb: nav ? ms(nav.responseStart) : 0,
+      dns: nav ? ms(nav.domainLookupEnd - nav.domainLookupStart) : 0,
+      conn: nav ? ms(nav.connectEnd - nav.connectStart) : 0,
+      type: nav ? nav.type : '-',
+      known: known, warm: warm, xfer: xfer
+    };
+  }
+
+  function render() {
+    var m = measure();
+    var vp = window.innerWidth + 'x' + window.innerHeight;
+    var verdict = ready === null ? '⚠️ ' + TIMEOUT_MS / 1000 + ' 秒內棋盤沒出現'
+      : m.warm > 0 ? '⚠️ 用到快取 ' + m.warm + '/' + m.known + '，不算：關掉分頁重來'
+      : m.known === 0 ? '✅ 算數（瀏覽器不回報快取，靠新的私密分頁保證）'
+      : '✅ 沒用到快取，這次算數';
+    text.textContent =
+      LABEL + ' 棋盤出現 ' + (ready === null ? '-' : Math.round(ready)) + ' ms' +
+      (paint === null ? '' : '（下一幀 ' + Math.round(paint) + ' ms）') + '\n' +
+      '首位元組 ' + m.ttfb + ' · DNS ' + m.dns + ' · 連線 ' + m.conn + ' ms · 傳輸 ' + (m.xfer / 1024).toFixed(1) + ' KB\n' +
+      verdict + '\n' +
+      'build ' + BUILD + ' · DPR ' + window.devicePixelRatio + ' · ' + vp +
+      (errors.length ? '\n錯誤 ' + errors.join(' | ') : '');
+    line = ['rum1', LABEL, 'ready=' + (ready === null ? 'timeout' : Math.round(ready)),
+      'paint=' + (paint === null ? '-' : Math.round(paint)), 'ttfb=' + m.ttfb, 'dns=' + m.dns, 'conn=' + m.conn,
+      'cache=' + m.warm + '/' + m.known, 'xfer=' + m.xfer, 'nav=' + m.type, 'dpr=' + window.devicePixelRatio,
+      'vp=' + vp, 'build=' + BUILD.replace(/ /g, '_'), 'err=' + errors.length, 'ua=' + navigator.userAgent].join(' ');
+    btn.hidden = false;
+  }
+
+  function onReady(mark) {
+    if (started) return;
+    started = true;
+    ready = mark.startTime;
+    // Two frames later the board has been composited at least once.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { paint = performance.now(); finished = true; render(); });
+    });
+  }
+
+  function check() {
+    var mark = performance.getEntriesByName('board-ready', 'mark')[0];
+    if (mark) onReady(mark);
+    return !!mark;
+  }
+
+  // This inline script runs while the HTML is parsed, i.e. before the deferred module / Unity loader can mark.
+  if (!check()) {
+    var observed = false;
+    if (window.PerformanceObserver) {
+      try {
+        var po = new PerformanceObserver(function () { if (check()) po.disconnect(); });
+        po.observe({ entryTypes: ['mark'] });
+        observed = true;
+      } catch (e) { /* fall back to polling */ }
+    }
+    if (!observed) { var timer = setInterval(function () { if (check()) clearInterval(timer); }, 20); }
+  }
+  setTimeout(function () { if (!started) { finished = true; render(); } }, TIMEOUT_MS);
+
+  btn.addEventListener('click', function () {
+    function legacy() {
+      var ta = document.createElement('textarea');
+      ta.value = line;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:-100px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, line.length);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { /* reported below */ }
+      document.body.removeChild(ta);
+      btn.textContent = ok ? '已複製' : '請長按上面文字複製';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(line).then(function () { btn.textContent = '已複製'; }, legacy);
+    } else {
+      legacy();
+    }
+  });
+})();
+</script>
+</body>
+</html>
