@@ -17,7 +17,7 @@
 <button id="rum-c" type="button" hidden style="margin-top:4px;padding:6px 12px;font:inherit">複製結果</button></div>
 <script>
 (function () {
-  var LABEL = 'dom@r2', BUILD = 'f3fdc4d 2026-10-24T05:10Z', TIMEOUT_MS = 60000;
+  var LABEL = 'dom@r2', BUILD = 'dbe956c 2026-10-24T05:28Z', TIMEOUT_MS = 60000;
   var text = document.getElementById('rum-t'), btn = document.getElementById('rum-c');
   var errors = [], started = false, finished = false, ready = null, paint = null, line = '';
 
@@ -39,9 +39,10 @@
       if (typeof e.transferSize !== 'number') continue;
       known++;
       xfer += e.transferSize;
-      // A network response always carries header bytes, so 0 = served from cache (iOS Safari also zeroes the
-      // body sizes then); fewer bytes than the body = 304 revalidation.
-      if (e.transferSize === 0 || e.transferSize < e.encodedBodySize) warm++;
+      // Every response here has a non-empty body, so a network load has encodedBodySize > 0 and
+      // transferSize >= it. transferSize 0 = cache; encodedBodySize 0 = cache too (iOS Safari reports only
+      // header bytes for a memory-cache hit, seen on a real iPhone); fewer bytes than the body = 304.
+      if (e.transferSize === 0 || !(e.encodedBodySize > 0) || e.transferSize < e.encodedBodySize) warm++;
     }
     return {
       ttfb: nav ? ms(nav.responseStart) : 0,
